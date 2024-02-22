@@ -7,9 +7,11 @@ import 'package:eshop/pages/widgets/cart.dart';
 import 'package:eshop/pages/widgets/fav.dart';
 import 'package:eshop/pages/widgets/home.dart';
 import 'package:eshop/pages/widgets/profile.dart';
+import 'package:eshop/service/controllers/cart_controller.dart';
 import 'package:eshop/service/model/product.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 class HomePage extends StatefulWidget {
@@ -26,14 +28,41 @@ final pages = <Widget>[
   Fav(),
   const Profile(),
 ];
-bool isSerch = false;
+bool isSerch = true;
+final CartController cartController = Get.put(CartController());
+
+class HighlightedText {
+  final String before;
+  final String matching;
+  final String after;
+
+  HighlightedText({required this.before, required this.matching, required this.after});
+}
+
+HighlightedText getHighlightedText(String text, String query) {
+  final queryLower = query.toLowerCase();
+  final textLower = text.toLowerCase();
+  final startIndex = textLower.indexOf(queryLower);
+
+  if (startIndex != -1) {
+    final endIndex = startIndex + queryLower.length;
+    return HighlightedText(
+      before: text.substring(0, startIndex),
+      matching: text.substring(startIndex, endIndex),
+      after: text.substring(endIndex),
+    );
+  } else {
+    return HighlightedText(before: text, matching: '', after: '');
+  }
+}
 
 class _HomePageState extends State<HomePage> {
   TextEditingController searchController = TextEditingController();
- List<Product> searchResults = [];
+  List<Product> searchResults = [];
+  
   Future<void> fetchSearchResults(String query) async {
-    final response =
-        await http.get(Uri.parse('http://localhost:3000/products/search?query=$query'));
+  if (query.isNotEmpty) { // Check if query is not empty
+    final response = await http.get(Uri.parse('http://localhost:3000/products?query=$query'));
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
       setState(() {
@@ -42,7 +71,16 @@ class _HomePageState extends State<HomePage> {
     } else {
       throw Exception('Failed to load search results');
     }
+  } else {
+    setState(() {
+      searchResults = []; // Clear search results if query is empty
+    });
   }
+}
+
+
+  
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -97,37 +135,41 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-      body: isSerch
-      ?pages[index]
-      :searchScreen(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: index,
-        onTap: (value) {
-          setState(() {
-            index = value;
-          });
-        },
-        selectedFontSize: 23,
-        selectedItemColor: Colors.black.withBlue(56),
-        unselectedItemColor: Colors.black,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(FontAwesomeIcons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(FontAwesomeIcons.shoppingCart),
-            label: 'Cart',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(FontAwesomeIcons.heart),
-            label: 'Favorite',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(FontAwesomeIcons.user),
-            label: 'Person',
-          ),
-        ],
+      body: isSerch ? pages[index] : searchScreen(),
+      bottomNavigationBar: Obx(
+         () {
+          return BottomNavigationBar(
+            currentIndex: index,
+            onTap: (value) {
+              setState(() {
+                index = value;
+              });
+            },
+            selectedFontSize: 23,
+            selectedItemColor: Colors.black.withBlue(56),
+            unselectedItemColor: Colors.black,
+            items:  [
+              const BottomNavigationBarItem(
+                icon: Icon(FontAwesomeIcons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+            label: Text('${cartController.itemCount}'),child: const Icon(FontAwesomeIcons.shoppingCart)),
+                label: 'Cart',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+            label: Text('${favtr.itemCount}'),child: const Icon(FontAwesomeIcons.heart)),
+                label: 'Favorite',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(FontAwesomeIcons.user),
+                label: 'Person',
+              ),
+            ],
+          );
+        }
       ),
     );
   }
@@ -137,12 +179,31 @@ class _HomePageState extends State<HomePage> {
       itemCount: searchResults.length,
       itemBuilder: (context, index) {
         final product = searchResults[index];
+        final highlightedName =
+            getHighlightedText(product.name, searchController.text);
         return ListTile(
-          title: Text(product.name),
+          leading:  SizedBox(
+                    width: 70, 
+                    height: 60, 
+                    child: Image.network(product.imgurl),
+                  ),
+          title:  RichText(
+            overflow: TextOverflow.fade, 
+            maxLines: 2,
+        text: TextSpan(
+          style: const TextStyle(color: Colors.black),
+          children: [
+            TextSpan(text: highlightedName.before, style: const TextStyle(fontWeight: FontWeight.normal)),
+            TextSpan(text: highlightedName.matching, style: const TextStyle(fontWeight: FontWeight.bold)),
+            TextSpan(text: highlightedName.after, style: const TextStyle(fontWeight: FontWeight.normal)),
+          ],
+        ),
+      ),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => ProductDetailScreen(product: product)),
+              MaterialPageRoute(
+                  builder: (context) => ProductDetailScreen(product: product)),
             );
           },
         );
