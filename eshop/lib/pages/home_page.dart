@@ -17,23 +17,26 @@ class HomePage extends StatefulWidget {
 int index = 0;
 final pages = <Widget>[
   const HomeWidget(),
-   Cart(),
-   Fav(),
+  Cart(),
+  Fav(),
   const Profile(),
 ];
+bool isSerch = false;
 
 class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Eshop'),
+        title: isSerch?const Text('Eshop'):TextField(),
         centerTitle: true,
         actions: <Widget>[
           IconButton(
             icon: const Icon(FontAwesomeIcons.searchengin),
             onPressed: () {
-              
+              setState(() {
+                isSerch = !isSerch;
+              });
             },
           ),
         ],
